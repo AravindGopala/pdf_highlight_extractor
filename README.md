@@ -1,5 +1,7 @@
 # pdf_highlight_extractor
 
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/aravinddatla)
+
 Extracts highlights from PDF documents as a summary
 
 The pdf can be highlighted using any of the popular tools like Adobe Acrobat, Foxit reader etc
