@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Highlight Extractor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 40px; background-color: #f0f2f5; }
+        .upload-container { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; border: 2px dashed #cbd5e0; }
+        .upload-container:hover { border-color: #3182ce; }
+        h1 { color: #1a202c; margin-bottom: 10px; }
+        #fileInput { margin: 20px 0; }
+        #results { margin-top: 30px; background: white; border-radius: 12px; padding: 20px; display: none; }
+        .highlight-item { border-left: 4px solid #ecc94b; background: #fffaf0; padding: 15px; margin-bottom: 15px; border-radius: 0 8px 8px 0; }
+        .page-label { font-weight: bold; color: #718096; font-size: 0.85rem; margin-bottom: 5px; display: block; }
+        .status { margin-top: 10px; color: #4a5568; font-style: italic; }
+        .btn-download { background: #3182ce; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="upload-container">
+    <h1>📖 PDF Highlight Extractor</h1>
+    <p>Select a PDF to extract your highlighted text</p>
+    <input type="file" id="fileInput" accept="application/pdf">
+    <div id="status" class="status"></div>
+</div>
+
+<div id="results">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 id="docTitle">Extracted Highlights</h2>
+        <button class="btn-download" onclick="downloadTxt()">Download as TXT</button>
+    </div>
+    <div id="highlightsList"></div>
+</div>
+
+<script>
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let extractedData = [];
+
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const status = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+        const list = document.getElementById('highlightsList');
+
+        status.textContent = "Processing... (this may take a moment for large files)";
+        list.innerHTML = "";
+        extractedData = [];
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const annotations = await page.getAnnotations();
+                const textContent = await page.getTextContent();
+
+                // Filter for Highlight annotations
+                const highlights = annotations.filter(annot => annot.subtype === 'Highlight');
+
+                for (const annot of highlights) {
+                    // Extract text based on the annotation's coordinates (rect)
+                    const rect = annot.rect; // [x1, y1, x2, y2]
+                    const text = extractTextFromRect(textContent, rect);
+
+                    if (text.trim()) {
+                        extractedData.push({ page: i, text: text.trim() });
+                        renderHighlight(i, text.trim());
+                    }
+                }
+            }
+
+            status.textContent = extractedData.length > 0 ? `Found ${extractedData.length} highlights.` : "No highlights found.";
+            if (extractedData.length > 0) resultsDiv.style.display = 'block';
+
+        } catch (err) {
+            console.error(err);
+            status.textContent = "Error processing PDF. Ensure it's not password protected.";
+        }
+    });
+
+    function extractTextFromRect(textContent, rect) {
+        // Simple overlap logic: find text items within the highlight box
+        return textContent.items
+            .filter(item => {
+                const x = item.transform[4];
+                const y = item.transform[5];
+                return x >= rect[0] && x <= rect[2] && y >= rect[1] && y <= rect[3];
+            })
+            .map(item => item.str)
+            .join(' ');
+    }
+
+    function renderHighlight(page, text) {
+        const list = document.getElementById('highlightsList');
+        const item = document.createElement('div');
+        item.className = 'highlight-item';
+        item.innerHTML = `<span class="page-label">PAGE ${page}</span><div>${text}</div>`;
+        list.appendChild(item);
+    }
+
+    function downloadTxt() {
+        let content = "EXTRACTED HIGHLIGHTS\n" + "=" .repeat(20) + "\n\n";
+        extractedData.forEach(item => {
+            content += `Page ${item.page}\n--------------------\n${item.text}\n\n`;
+        });
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "highlights.txt";
+        a.click();
+    }
+</script>
+
+</body>
+</html>
