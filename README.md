@@ -16,7 +16,7 @@ Extracting highlights from PDFs is surprisingly difficult without paid software 
 
 ## 🚀 How to Use
 
-1. Visit the live tool: **[INSERT YOUR GITHUB PAGES LINK HERE]**
+1. Visit the live tool: **<https://aravindgopala.github.io/pdf_highlight_extractor>**
 2. Drag and drop your PDF into the upload zone.
 3. Review your highlights on the screen.
 4. Click **Download .MD** or **Download .TXT** to save your notes.
