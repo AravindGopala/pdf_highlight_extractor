@@ -6,31 +6,39 @@
     <title>PDF Highlight Extractor</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 40px; background-color: #f0f2f5; }
-        .upload-container { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; border: 2px dashed #cbd5e0; }
-        .upload-container:hover { border-color: #3182ce; }
-        h1 { color: #1a202c; margin-bottom: 10px; }
-        #fileInput { margin: 20px 0; }
-        #results { margin-top: 30px; background: white; border-radius: 12px; padding: 20px; display: none; }
-        .highlight-item { border-left: 4px solid #ecc94b; background: #fffaf0; padding: 15px; margin-bottom: 15px; border-radius: 0 8px 8px 0; }
-        .page-label { font-weight: bold; color: #718096; font-size: 0.85rem; margin-bottom: 5px; display: block; }
-        .status { margin-top: 10px; color: #4a5568; font-style: italic; }
-        .btn-download { background: #3182ce; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        :root { --primary: #3182ce; --bg: #f7fafc; --card: #ffffff; --text: #2d3748; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        .card { background: var(--card); padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+        .upload-zone { border: 2px dashed #cbd5e0; padding: 40px; text-align: center; cursor: pointer; transition: 0.3s; border-radius: 8px; }
+        .upload-zone:hover { border-color: var(--primary); background: #ebf8ff; }
+        #results { margin-top: 30px; display: none; }
+        .actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn { padding: 10px 18px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-outline { background: transparent; border: 1px solid #cbd5e0; color: var(--text); }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .highlight-item { background: #fffdf0; border-left: 4px solid #ecc94b; padding: 15px; margin-bottom: 12px; border-radius: 0 6px 6px 0; }
+        .page-tag { font-size: 12px; font-weight: bold; color: #a0aec0; margin-bottom: 4px; display: block; }
     </style>
 </head>
 <body>
 
-<div class="upload-container">
+<div class="card">
     <h1>📖 PDF Highlight Extractor</h1>
-    <p>Select a PDF to extract your highlighted text</p>
-    <input type="file" id="fileInput" accept="application/pdf">
-    <div id="status" class="status"></div>
+    <p>Upload a PDF to extract your highlights and export them.</p>
+
+    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+        <p>Click to select or drag & drop PDF</p>
+        <input type="file" id="fileInput" accept="application/pdf" hidden>
+    </div>
+    <div id="status" style="margin-top: 15px; font-weight: 500;"></div>
 </div>
 
 <div id="results">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h2 id="docTitle">Extracted Highlights</h2>
-        <button class="btn-download" onclick="downloadTxt()">Download as TXT</button>
+    <div class="actions">
+        <button class="btn btn-primary" onclick="downloadFile('txt')">Download .TXT</button>
+        <button class="btn btn-outline" onclick="downloadFile('md')">Download .MD (Markdown)</button>
+        <button class="btn btn-outline" onclick="copyToClipboard()">📋 Copy to Clipboard</button>
     </div>
     <div id="highlightsList"></div>
 </div>
@@ -40,16 +48,17 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     let extractedData = [];
+    let currentFileName = "highlights";
 
     document.getElementById('fileInput').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        currentFileName = file.name.replace(".pdf", "");
         const status = document.getElementById('status');
-        const resultsDiv = document.getElementById('results');
         const list = document.getElementById('highlightsList');
 
-        status.textContent = "Processing... (this may take a moment for large files)";
+        status.innerHTML = "⏳ Processing pages...";
         list.innerHTML = "";
         extractedData = [];
 
@@ -62,61 +71,64 @@
                 const annotations = await page.getAnnotations();
                 const textContent = await page.getTextContent();
 
-                // Filter for Highlight annotations
-                const highlights = annotations.filter(annot => annot.subtype === 'Highlight');
+                const highlights = annotations.filter(a => a.subtype === 'Highlight');
 
                 for (const annot of highlights) {
-                    // Extract text based on the annotation's coordinates (rect)
-                    const rect = annot.rect; // [x1, y1, x2, y2]
-                    const text = extractTextFromRect(textContent, rect);
-
-                    if (text.trim()) {
-                        extractedData.push({ page: i, text: text.trim() });
-                        renderHighlight(i, text.trim());
+                    const text = extractText(textContent, annot.rect);
+                    if (text) {
+                        extractedData.push({ page: i, text: text });
+                        renderItem(i, text);
                     }
                 }
             }
 
-            status.textContent = extractedData.length > 0 ? `Found ${extractedData.length} highlights.` : "No highlights found.";
-            if (extractedData.length > 0) resultsDiv.style.display = 'block';
-
+            status.innerHTML = extractedData.length > 0 ? `✅ Found ${extractedData.length} highlights.` : "❌ No highlights found.";
+            document.getElementById('results').style.display = extractedData.length > 0 ? 'block' : 'none';
         } catch (err) {
-            console.error(err);
-            status.textContent = "Error processing PDF. Ensure it's not password protected.";
+            status.innerHTML = "❌ Error: Could not read PDF.";
         }
     });
 
-    function extractTextFromRect(textContent, rect) {
-        // Simple overlap logic: find text items within the highlight box
+    function extractText(textContent, rect) {
         return textContent.items
             .filter(item => {
-                const x = item.transform[4];
-                const y = item.transform[5];
+                const [,, , , x, y] = item.transform;
                 return x >= rect[0] && x <= rect[2] && y >= rect[1] && y <= rect[3];
             })
             .map(item => item.str)
-            .join(' ');
+            .join(' ').replace(/\s+/g, ' ').trim();
     }
 
-    function renderHighlight(page, text) {
-        const list = document.getElementById('highlightsList');
-        const item = document.createElement('div');
-        item.className = 'highlight-item';
-        item.innerHTML = `<span class="page-label">PAGE ${page}</span><div>${text}</div>`;
-        list.appendChild(item);
+    function renderItem(page, text) {
+        const div = document.createElement('div');
+        div.className = 'highlight-item';
+        div.innerHTML = `<span class="page-tag">PAGE ${page}</span><div>${text}</div>`;
+        document.getElementById('highlightsList').appendChild(div);
     }
 
-    function downloadTxt() {
-        let content = "EXTRACTED HIGHLIGHTS\n" + "=" .repeat(20) + "\n\n";
+    function downloadFile(format) {
+        let content = format === 'md' ? `# Highlights for ${currentFileName}\n\n` : `HIGHLIGHTS: ${currentFileName}\n\n`;
+
         extractedData.forEach(item => {
-            content += `Page ${item.page}\n--------------------\n${item.text}\n\n`;
+            if (format === 'md') {
+                content += `### Page ${item.page}\n> ${item.text}\n\n`;
+            } else {
+                content += `[Page ${item.page}]\n${item.text}\n\n`;
+            }
         });
+
         const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = "highlights.txt";
+        a.download = `${currentFileName}_highlights.${format}`;
         a.click();
+    }
+
+    function copyToClipboard() {
+        const text = extractedData.map(d => `[Page ${d.page}] ${d.text}`).join('\n\n');
+        navigator.clipboard.writeText(text);
+        alert("Copied to clipboard!");
     }
 </script>
 
