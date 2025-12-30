@@ -1,12 +1,16 @@
 # pdf_highlight_extractor
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/aravinddatla)
-
 Extracts highlights from PDF documents as a summary
+
+Access the tool at <https://aravindgopala.github.io/pdf_highlight_extractor/>
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/aravinddatla)
 
 The pdf can be highlighted using any of the popular tools like Adobe Acrobat, Foxit reader etc
 
 The summary is saved in the same directory as the pdf file named as `<filename>_summary.txt`
+
+## If you want to run the tool locally, below are the steps:
 
 ## Dependencies
 
